@@ -107,6 +107,37 @@ function Sparkline({ data, color, height = 60 }: { data: number[]; color: string
   );
 }
 
+// Accounts data
+type Account = {
+  id: number; platform: string; username: string; avatar: string;
+  status: 'active' | 'paused' | 'error'; campaigns: number; viewers: number; added: string;
+};
+
+const nextAccId = 6;
+const GRADIENT_AVATARS = [
+  'from-violet-500 to-pink-500',
+  'from-red-500 to-orange-400',
+  'from-emerald-500 to-teal-400',
+  'from-blue-500 to-cyan-400',
+  'from-amber-500 to-yellow-400',
+];
+
+const INITIAL_ACCOUNTS: Account[] = [
+  { id: 1, platform: 'YouTube', username: '@ProStreamer_YT', avatar: 'from-red-500 to-orange-400', status: 'active', campaigns: 3, viewers: 8650, added: '12 июн' },
+  { id: 2, platform: 'YouTube', username: '@GamingHub_RU',  avatar: 'from-pink-500 to-rose-400',  status: 'active', campaigns: 1, viewers: 2100, added: '14 июн' },
+  { id: 3, platform: 'Twitch',  username: 'streamer_twitch', avatar: 'from-violet-500 to-purple-400', status: 'active', campaigns: 2, viewers: 4200, added: '10 июн' },
+  { id: 4, platform: 'Twitch',  username: 'kick_master_pro', avatar: 'from-blue-500 to-indigo-400',  status: 'paused', campaigns: 0, viewers: 0,    added: '8 июн' },
+  { id: 5, platform: 'Kick',    username: 'KickLive_Pro',    avatar: 'from-emerald-500 to-green-400', status: 'error',  campaigns: 0, viewers: 0,    added: '5 июн' },
+];
+
+const EMPTY_ACC_FORM = { platform: 'YouTube', username: '' };
+
+const STATUS_ACC: Record<string, { label: string; cls: string; dot: string }> = {
+  active: { label: 'Активен',  cls: 'text-accent bg-accent/10',       dot: 'bg-accent' },
+  paused: { label: 'Пауза',    cls: 'text-yellow-400 bg-yellow-400/10', dot: 'bg-yellow-400' },
+  error:  { label: 'Ошибка',   cls: 'text-destructive bg-destructive/10', dot: 'bg-destructive' },
+};
+
 // Bar chart
 function BarChart({ data, color, labels }: { data: number[]; color: string; labels: string[] }) {
   const max = Math.max(...data);
@@ -136,9 +167,43 @@ const Index = () => {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'day' | 'week'>('day');
   const [activePlatforms, setActivePlatforms] = useState<string[]>(['YouTube', 'Twitch', 'Kick']);
+  const [accounts, setAccounts] = useState<Account[]>(INITIAL_ACCOUNTS);
+  const [accModal, setAccModal] = useState(false);
+  const [accForm, setAccForm] = useState({ ...EMPTY_ACC_FORM });
+  const [filterPlatform, setFilterPlatform] = useState<string>('Все');
 
   const togglePlatform = (p: string) =>
     setActivePlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
+
+  const addAccount = () => {
+    if (!accForm.username.trim()) return;
+    setAccounts((prev) => [
+      {
+        id: nextAccId++,
+        platform: accForm.platform,
+        username: accForm.username.trim(),
+        avatar: GRADIENT_AVATARS[Math.floor(Math.random() * GRADIENT_AVATARS.length)],
+        status: 'active',
+        campaigns: 0,
+        viewers: 0,
+        added: new Date().toLocaleDateString('ru', { day: 'numeric', month: 'короткий' }).replace('.', ''),
+      },
+      ...prev,
+    ]);
+    setAccModal(false);
+  };
+
+  const toggleAccStatus = (id: number) => {
+    setAccounts((prev) => prev.map((a) =>
+      a.id === id ? { ...a, status: a.status === 'active' ? 'paused' : 'active' } : a
+    ));
+  };
+
+  const deleteAccount = (id: number) => {
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const filteredAccounts = filterPlatform === 'Все' ? accounts : accounts.filter((a) => a.platform === filterPlatform);
 
   const openModal = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };
 
@@ -393,8 +458,156 @@ const Index = () => {
             </div>
           )}
 
+          {/* ─── ACCOUNTS ─── */}
+          {active === 'accounts' && (
+            <div className="space-y-6 animate-fade-in-up">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Аккаунты</h1>
+                  <p className="text-muted-foreground mt-1">Управляйте подключёнными аккаунтами на платформах.</p>
+                </div>
+                <button onClick={() => { setAccForm({ ...EMPTY_ACC_FORM }); setAccModal(true); }}
+                  className="sm:ml-auto flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition shrink-0">
+                  <Icon name="Plus" size={16} /> Добавить аккаунт
+                </button>
+              </div>
+
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-4">
+                {(['YouTube', 'Twitch', 'Kick'] as const).map((p) => {
+                  const pAccs = accounts.filter((a) => a.platform === p);
+                  return (
+                    <div key={p} className="rounded-2xl border border-border bg-card p-4 hover:border-primary/40 transition-colors">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Icon name={PLATFORM_META[p].icon} size={18} className={PLATFORM_META[p].color} />
+                        <span className="font-semibold">{p}</span>
+                      </div>
+                      <div className="font-mono-num text-2xl font-bold">{pAccs.length}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {pAccs.filter((a) => a.status === 'active').length} активных
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Filter tabs */}
+              <div className="flex gap-2 flex-wrap">
+                {['Все', 'YouTube', 'Twitch', 'Kick'].map((f) => (
+                  <button key={f} onClick={() => setFilterPlatform(f)}
+                    className={`text-sm font-semibold px-3.5 py-1.5 rounded-xl border transition ${filterPlatform === f ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-secondary/60'}`}>
+                    {f} {f !== 'Все' && <span className="font-mono-num ml-1 opacity-60">{accounts.filter((a) => a.platform === f).length}</span>}
+                  </button>
+                ))}
+              </div>
+
+              {/* Account list */}
+              <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                {filteredAccounts.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+                    <Icon name="Users" size={36} />
+                    <p className="text-sm">Нет аккаунтов. Добавьте первый!</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {filteredAccounts.map((a) => {
+                      const s = STATUS_ACC[a.status];
+                      return (
+                        <div key={a.id} className="p-5 flex items-center gap-4 hover:bg-secondary/30 transition-colors group">
+                          {/* Avatar */}
+                          <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${a.avatar} shrink-0 grid place-items-center font-bold text-white text-sm`}>
+                            {a.username.replace('@', '').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold truncate">{a.username}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <Icon name={PLATFORM_META[a.platform].icon} size={12} className={PLATFORM_META[a.platform].color} />
+                              <span className="text-xs text-muted-foreground">{a.platform}</span>
+                              <span className="text-xs text-muted-foreground">· добавлен {a.added}</span>
+                            </div>
+                          </div>
+                          <div className="hidden sm:flex flex-col items-end gap-1 shrink-0 w-32">
+                            <div className="font-mono-num text-sm font-bold">{a.viewers.toLocaleString('ru')}</div>
+                            <div className="text-xs text-muted-foreground">{a.campaigns} кампаний</div>
+                          </div>
+                          <span className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${s.cls}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${s.dot} ${a.status === 'active' ? 'pulse-dot' : ''}`} />
+                            {s.label}
+                          </span>
+                          <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => toggleAccStatus(a.id)} title={a.status === 'active' ? 'Пауза' : 'Активировать'}
+                              className="h-8 w-8 rounded-lg border border-border grid place-items-center hover:bg-secondary transition">
+                              <Icon name={a.status === 'active' ? 'Pause' : 'Play'} size={14} className="text-muted-foreground" />
+                            </button>
+                            <button onClick={() => deleteAccount(a.id)} title="Удалить"
+                              className="h-8 w-8 rounded-lg border border-border grid place-items-center hover:bg-destructive/10 transition">
+                              <Icon name="Trash2" size={14} className="text-destructive" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Add account */}
+          {accModal && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-background/70 backdrop-blur-sm animate-fade-in-up"
+              onClick={() => setAccModal(false)}>
+              <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border border-border bg-card p-6 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="h-9 w-9 rounded-xl bg-primary/15 grid place-items-center">
+                    <Icon name="UserPlus" size={18} className="text-primary" />
+                  </div>
+                  <h2 className="font-bold text-lg">Добавить аккаунт</h2>
+                  <button onClick={() => setAccModal(false)} className="ml-auto h-8 w-8 grid place-items-center rounded-lg hover:bg-secondary transition">
+                    <Icon name="X" size={18} />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Платформа</label>
+                    <div className="mt-1.5 grid grid-cols-3 gap-2">
+                      {(['YouTube', 'Twitch', 'Kick'] as const).map((p) => (
+                        <button key={p} onClick={() => setAccForm({ ...accForm, platform: p })}
+                          className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-semibold transition ${accForm.platform === p ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:bg-secondary/60'}`}>
+                          <Icon name={PLATFORM_META[p].icon} size={20} className={PLATFORM_META[p].color} />
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Имя пользователя / канал</label>
+                    <input value={accForm.username} onChange={(e) => setAccForm({ ...accForm, username: e.target.value })}
+                      placeholder={accForm.platform === 'YouTube' ? '@YourChannel' : 'your_username'}
+                      className="mt-1.5 w-full rounded-xl bg-secondary/60 border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary transition"
+                      onKeyDown={(e) => e.key === 'Enter' && addAccount()} />
+                  </div>
+                  <div className="rounded-xl border border-border bg-secondary/30 p-3.5 flex gap-2.5">
+                    <Icon name="Info" size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground">После добавления аккаунт появится в списке. Авторизация платформы — следующий шаг.</p>
+                  </div>
+                  <div className="flex gap-2.5 pt-1">
+                    <button onClick={() => setAccModal(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-secondary/60 transition">
+                      Отмена
+                    </button>
+                    <button onClick={addAccount} disabled={!accForm.username.trim()}
+                      className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                      <Icon name="UserPlus" size={16} /> Добавить
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ─── DASHBOARD ─── */}
-          {active !== 'analytics' && <>
+          {active !== 'analytics' && active !== 'accounts' && <>
           {/* Hero */}
           <section className="animate-fade-in-up">
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
