@@ -30,17 +30,17 @@ const PLATFORM_META: Record<string, { icon: string; color: string }> = {
 };
 
 type Campaign = {
-  name: string; platform: string; icon: string;
+  id: number; name: string; platform: string; icon: string;
   viewers: number; bots: number; progress: number; state: string;
 };
 
 type Scheduled = { time: string; name: string; platform: string; dur: string };
 
 const INITIAL_CAMPAIGNS: Campaign[] = [
-  { name: 'Вечерний стрим Dota 2', platform: 'Twitch', icon: 'Twitch', viewers: 4200, bots: 120, progress: 76, state: 'live' },
-  { name: 'Премьера клипа', platform: 'YouTube', icon: 'Youtube', viewers: 6800, bots: 90, progress: 54, state: 'live' },
-  { name: 'Турнир CS2 финал', platform: 'Kick', icon: 'Zap', viewers: 0, bots: 0, progress: 0, state: 'scheduled' },
-  { name: 'Утренний подкаст', platform: 'YouTube', icon: 'Youtube', viewers: 1850, bots: 54, progress: 31, state: 'live' },
+  { id: 1, name: 'Вечерний стрим Dota 2', platform: 'Twitch', icon: 'Twitch', viewers: 4200, bots: 120, progress: 76, state: 'live' },
+  { id: 2, name: 'Премьера клипа', platform: 'YouTube', icon: 'Youtube', viewers: 6800, bots: 90, progress: 54, state: 'live' },
+  { id: 3, name: 'Турнир CS2 финал', platform: 'Kick', icon: 'Zap', viewers: 0, bots: 0, progress: 0, state: 'scheduled' },
+  { id: 4, name: 'Утренний подкаст', platform: 'YouTube', icon: 'Youtube', viewers: 1850, bots: 54, progress: 31, state: 'live' },
 ];
 
 const INITIAL_SCHEDULE: Scheduled[] = [
@@ -51,6 +51,7 @@ const INITIAL_SCHEDULE: Scheduled[] = [
 ];
 
 const EMPTY_FORM = { name: '', platform: 'Twitch', viewers: 1000, bots: 50, time: '', dur: '2 ч' };
+let nextId = 5;
 
 const Index = () => {
   const [active, setActive] = useState('dashboard');
@@ -67,6 +68,7 @@ const Index = () => {
     const scheduled = form.time.trim().length > 0;
     setCampaigns((prev) => [
       {
+        id: nextId++,
         name: form.name.trim(),
         platform: form.platform,
         icon: meta.icon,
@@ -84,6 +86,22 @@ const Index = () => {
       ]);
     }
     setModalOpen(false);
+  };
+
+  const pauseCampaign = (id: number) => {
+    setCampaigns((prev) =>
+      prev.map((c) => c.id === id ? { ...c, state: c.state === 'paused' ? 'live' : 'paused' } : c)
+    );
+  };
+
+  const stopCampaign = (id: number) => {
+    setCampaigns((prev) =>
+      prev.map((c) => c.id === id ? { ...c, state: 'stopped', viewers: 0, bots: 0, progress: 100 } : c)
+    );
+  };
+
+  const deleteCampaign = (id: number) => {
+    setCampaigns((prev) => prev.filter((c) => c.id !== id));
   };
 
   return (
@@ -198,41 +216,89 @@ const Index = () => {
                 </button>
               </div>
               <div className="divide-y divide-border">
-                {campaigns.map((c) => (
-                  <div key={c.name} className="p-5 flex items-center gap-4 hover:bg-secondary/30 transition-colors">
-                    <div className="h-10 w-10 rounded-xl bg-secondary grid place-items-center shrink-0">
-                      <Icon name={c.icon} size={18} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">{c.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{c.platform}</div>
-                      <div className="mt-2.5 h-1.5 rounded-full bg-secondary overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${c.state === 'live' ? 'bg-gradient-to-r from-primary to-accent' : 'bg-muted'}`}
-                          style={{ width: `${c.progress}%` }}
-                        />
+                {campaigns.map((c) => {
+                  const isLive = c.state === 'live';
+                  const isPaused = c.state === 'paused';
+                  const isStopped = c.state === 'stopped';
+                  const isScheduled = c.state === 'scheduled';
+                  return (
+                    <div key={c.id} className="p-5 flex items-center gap-3 hover:bg-secondary/30 transition-colors group">
+                      <div className="h-10 w-10 rounded-xl bg-secondary grid place-items-center shrink-0">
+                        <Icon name={c.icon} size={18} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className={`font-medium truncate ${isStopped ? 'text-muted-foreground line-through' : ''}`}>{c.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{c.platform}</div>
+                        <div className="mt-2.5 h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              isLive ? 'bg-gradient-to-r from-primary to-accent'
+                              : isPaused ? 'bg-yellow-500/70'
+                              : isStopped ? 'bg-destructive/50'
+                              : 'bg-muted'
+                            }`}
+                            style={{ width: `${c.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="hidden sm:flex flex-col items-end gap-1 shrink-0 w-24">
+                        {(isLive || isPaused) ? (
+                          <>
+                            <div className="font-mono-num font-bold">{c.viewers.toLocaleString('ru')}</div>
+                            <div className="text-xs text-muted-foreground">{c.bots} ботов</div>
+                          </>
+                        ) : isScheduled ? (
+                          <span className="text-xs font-semibold text-accent flex items-center gap-1">
+                            <Icon name="Clock" size={13} /> В очереди
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1">
+                        {/* Status badge */}
+                        <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                          isLive ? 'text-accent bg-accent/10'
+                          : isPaused ? 'text-yellow-400 bg-yellow-400/10'
+                          : isStopped ? 'text-destructive bg-destructive/10'
+                          : 'text-muted-foreground bg-secondary'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${
+                            isLive ? 'bg-accent pulse-dot'
+                            : isPaused ? 'bg-yellow-400'
+                            : isStopped ? 'bg-destructive'
+                            : 'bg-muted-foreground'
+                          }`} />
+                          {isLive ? 'LIVE' : isPaused ? 'Пауза' : isStopped ? 'Стоп' : 'Ждёт'}
+                        </span>
+                        {/* Action buttons — visible on hover */}
+                        {!isStopped && (
+                          <button
+                            onClick={() => pauseCampaign(c.id)}
+                            title={isPaused ? 'Возобновить' : 'Пауза'}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 rounded-lg border border-border grid place-items-center hover:bg-secondary ml-1"
+                          >
+                            <Icon name={isPaused ? 'Play' : 'Pause'} size={14} className="text-muted-foreground" />
+                          </button>
+                        )}
+                        {!isStopped && (
+                          <button
+                            onClick={() => stopCampaign(c.id)}
+                            title="Остановить"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 rounded-lg border border-border grid place-items-center hover:bg-destructive/10"
+                          >
+                            <Icon name="Square" size={14} className="text-destructive" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteCampaign(c.id)}
+                          title="Удалить"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 rounded-lg border border-border grid place-items-center hover:bg-destructive/10"
+                        >
+                          <Icon name="Trash2" size={14} className="text-destructive" />
+                        </button>
                       </div>
                     </div>
-                    <div className="hidden sm:flex flex-col items-end gap-1 shrink-0 w-28">
-                      {c.state === 'live' ? (
-                        <>
-                          <div className="font-mono-num font-bold">{c.viewers.toLocaleString('ru')}</div>
-                          <div className="text-xs text-muted-foreground">{c.bots} ботов</div>
-                        </>
-                      ) : (
-                        <span className="text-xs font-semibold text-accent flex items-center gap-1">
-                          <Icon name="Clock" size={13} /> Запланировано
-                        </span>
-                      )}
-                    </div>
-                    <span className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      c.state === 'live' ? 'text-accent bg-accent/10' : 'text-muted-foreground bg-secondary'
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${c.state === 'live' ? 'bg-accent pulse-dot' : 'bg-muted-foreground'}`} />
-                      {c.state === 'live' ? 'LIVE' : 'Ждёт'}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
