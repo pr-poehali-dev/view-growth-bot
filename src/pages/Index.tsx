@@ -138,6 +138,94 @@ const STATUS_ACC: Record<string, { label: string; cls: string; dot: string }> = 
   error:  { label: 'Ошибка',   cls: 'text-destructive bg-destructive/10', dot: 'bg-destructive' },
 };
 
+// Platform card component
+type PlatformDef = {
+  name: string; icon: string; color: string; bg: string; border: string; accent: string;
+  connected: boolean; desc: string; features: string[];
+  stats: { viewers: string; bots: string; campaigns: number };
+  settings: { label: string; sub: string; on: boolean }[];
+};
+
+function PlatformCard({ platform: p }: { platform: PlatformDef }) {
+  const [connected, setConnected] = useState(p.connected);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className={`rounded-2xl border bg-card overflow-hidden transition-colors ${connected ? p.border : 'border-border'}`}>
+      {/* Header */}
+      <div className={`p-5 bg-gradient-to-r ${p.bg} flex items-center gap-4`}>
+        <div className="h-12 w-12 rounded-xl bg-card/80 grid place-items-center shrink-0 border border-border">
+          <Icon name={p.icon} size={26} className={p.color} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-lg">{p.name}</span>
+            {connected
+              ? <span className="text-xs font-semibold text-accent bg-accent/10 px-2.5 py-0.5 rounded-full flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-accent pulse-dot" />Подключено</span>
+              : <span className="text-xs font-semibold text-muted-foreground bg-secondary px-2.5 py-0.5 rounded-full">Не подключено</span>
+            }
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{p.desc}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {connected && (
+            <button onClick={() => setOpen((v) => !v)}
+              className="h-9 w-9 rounded-xl border border-border bg-card/60 grid place-items-center hover:bg-secondary transition">
+              <Icon name={open ? 'ChevronUp' : 'Settings2'} size={16} className="text-muted-foreground" />
+            </button>
+          )}
+          <button
+            onClick={() => setConnected((v) => !v)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${connected ? 'border border-border bg-card/60 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40' : 'bg-primary text-primary-foreground hover:opacity-90'}`}>
+            {connected ? 'Отключить' : 'Подключить'}
+          </button>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      {connected && (
+        <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
+          {[
+            { label: 'Зрителей', value: p.stats.viewers, icon: 'Eye' },
+            { label: 'Чат-ботов', value: p.stats.bots, icon: 'Bot' },
+            { label: 'Кампаний', value: String(p.stats.campaigns), icon: 'Rocket' },
+          ].map((s) => (
+            <div key={s.label} className="p-4 flex items-center gap-3">
+              <Icon name={s.icon} size={16} className="text-muted-foreground shrink-0" />
+              <div>
+                <div className="font-mono-num font-bold" style={{ color: p.accent }}>{s.value}</div>
+                <div className="text-[10px] text-muted-foreground">{s.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Features */}
+      <div className="px-5 py-3 flex flex-wrap gap-2 border-t border-border">
+        {p.features.map((f) => (
+          <span key={f} className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-secondary text-muted-foreground flex items-center gap-1">
+            <Icon name="Check" size={11} className={connected ? p.color : ''} /> {f}
+          </span>
+        ))}
+      </div>
+
+      {/* Settings panel */}
+      {open && connected && (
+        <div className="border-t border-border divide-y divide-border">
+          <div className="px-5 py-3 flex items-center gap-2">
+            <Icon name="Sliders" size={14} className="text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Настройки платформы</span>
+          </div>
+          {p.settings.map((s) => (
+            <SettingsRow key={s.label} label={s.label} sub={s.sub} icon="Toggle" on={s.on} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Settings toggle row
 function SettingsRow({ label, sub, icon, on }: { label: string; sub: string; icon: string; on: boolean }) {
   const [enabled, setEnabled] = useState(on);
@@ -810,6 +898,75 @@ const Index = () => {
             </div>
           </section>
           </>}
+
+          {/* ─── PLATFORMS ─── */}
+          {active === 'platforms' && (
+            <div className="space-y-6 animate-fade-in-up">
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Платформы</h1>
+                <p className="text-muted-foreground mt-1">Подключение и настройка сервисов для накрутки.</p>
+              </div>
+
+              {/* Platform cards */}
+              <div className="grid gap-5">
+                {[
+                  {
+                    name: 'YouTube',
+                    icon: 'Youtube',
+                    color: 'text-red-500',
+                    bg: 'from-red-500/10 to-orange-500/5',
+                    border: 'border-red-500/20',
+                    accent: '#ef4444',
+                    connected: true,
+                    desc: 'Накрутка просмотров, лайков и комментариев через чат-ботов.',
+                    features: ['Накрутка зрителей', 'Чат-боты', 'Лайки', 'Подписчики'],
+                    stats: { viewers: '8 650', bots: '224', campaigns: 3 },
+                    settings: [
+                      { label: 'Случайные задержки', sub: 'Имитация живых зрителей', on: true },
+                      { label: 'Авто-комментарии', sub: 'Боты пишут в чат по скрипту', on: true },
+                      { label: 'Геофильтр', sub: 'Зрители только из РФ', on: false },
+                    ],
+                  },
+                  {
+                    name: 'Twitch',
+                    icon: 'Twitch',
+                    color: 'text-purple-400',
+                    bg: 'from-purple-500/10 to-violet-500/5',
+                    border: 'border-purple-500/20',
+                    accent: '#a855f7',
+                    connected: true,
+                    desc: 'Накрутка зрителей и чат-активности для роста в категориях.',
+                    features: ['Накрутка зрителей', 'Чат-боты', 'Фолловеры', 'Клипы'],
+                    stats: { viewers: '4 200', bots: '164', campaigns: 2 },
+                    settings: [
+                      { label: 'Случайные задержки', sub: 'Имитация живых зрителей', on: true },
+                      { label: 'Чат-активность', sub: 'Боты реагируют на события', on: false },
+                      { label: 'Защита от бана', sub: 'Умный лимит в час', on: true },
+                    ],
+                  },
+                  {
+                    name: 'Kick',
+                    icon: 'Zap',
+                    color: 'text-green-400',
+                    bg: 'from-green-500/10 to-emerald-500/5',
+                    border: 'border-green-500/20',
+                    accent: '#22c55e',
+                    connected: false,
+                    desc: 'Молодая платформа с высоким органическим охватом.',
+                    features: ['Накрутка зрителей', 'Чат-боты', 'Фолловеры'],
+                    stats: { viewers: '0', bots: '0', campaigns: 0 },
+                    settings: [
+                      { label: 'Случайные задержки', sub: 'Имитация живых зрителей', on: false },
+                      { label: 'Чат-активность', sub: 'Боты реагируют на события', on: false },
+                      { label: 'Геофильтр', sub: 'Зрители только из РФ', on: false },
+                    ],
+                  },
+                ].map((p) => (
+                  <PlatformCard key={p.name} platform={p} />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ─── PROFILE ─── */}
           {active === 'profile' && (
