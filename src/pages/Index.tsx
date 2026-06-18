@@ -138,6 +138,28 @@ const STATUS_ACC: Record<string, { label: string; cls: string; dot: string }> = 
   error:  { label: 'Ошибка',   cls: 'text-destructive bg-destructive/10', dot: 'bg-destructive' },
 };
 
+// Settings toggle row
+function SettingsRow({ label, sub, icon, on }: { label: string; sub: string; icon: string; on: boolean }) {
+  const [enabled, setEnabled] = useState(on);
+  return (
+    <div className="flex items-center gap-4 p-5 hover:bg-secondary/30 transition-colors">
+      <div className="h-9 w-9 rounded-xl bg-secondary grid place-items-center shrink-0">
+        <Icon name={icon} size={16} className="text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>
+      </div>
+      <button
+        onClick={() => setEnabled((v) => !v)}
+        className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${enabled ? 'bg-primary' : 'bg-secondary border border-border'}`}
+      >
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      </button>
+    </div>
+  );
+}
+
 // Bar chart
 function BarChart({ data, color, labels }: { data: number[]; color: string; labels: string[] }) {
   const max = Math.max(...data);
@@ -788,6 +810,101 @@ const Index = () => {
             </div>
           </section>
           </>}
+
+          {/* ─── PROFILE ─── */}
+          {active === 'profile' && (
+            <div className="space-y-6 animate-fade-in-up max-w-2xl">
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Профиль</h1>
+                <p className="text-muted-foreground mt-1">Настройки аккаунта и управление подпиской.</p>
+              </div>
+
+              {/* User card */}
+              <div className="rounded-2xl border border-border bg-card p-6 flex items-center gap-5">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-accent shrink-0 grid place-items-center text-white font-extrabold text-xl">
+                  АК
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-xl">Алексей Кузнецов</div>
+                  <div className="text-sm text-muted-foreground mt-0.5">aleksey@example.com</div>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <Icon name="Crown" size={14} className="text-accent" />
+                    <span className="text-xs font-semibold text-accent">PRO подписка</span>
+                    <span className="text-xs text-muted-foreground">· активна до 19 июл 2026</span>
+                  </div>
+                </div>
+                <button className="shrink-0 px-4 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-secondary/60 transition">
+                  Изменить
+                </button>
+              </div>
+
+              {/* Subscription */}
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Icon name="Crown" size={18} className="text-accent" />
+                  <h2 className="font-semibold">Тарифный план — PRO</h2>
+                  <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full text-accent bg-accent/10">Активен</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                  {[
+                    { label: 'Кампании', value: '∞', sub: 'безлимит' },
+                    { label: 'Чат-боты', value: '∞', sub: 'безлимит' },
+                    { label: 'Аккаунты', value: '50', sub: 'максимум' },
+                    { label: 'Зрителей', value: '100K', sub: 'одновременно' },
+                  ].map((f) => (
+                    <div key={f.label} className="rounded-xl bg-card border border-border p-3 text-center">
+                      <div className="font-mono-num font-bold text-lg text-accent">{f.value}</div>
+                      <div className="text-xs font-semibold mt-0.5">{f.label}</div>
+                      <div className="text-[10px] text-muted-foreground">{f.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2.5">
+                  <button className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition">
+                    Продлить подписку
+                  </button>
+                  <button className="px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-secondary/60 transition">
+                    История платежей
+                  </button>
+                </div>
+              </div>
+
+              {/* Settings */}
+              <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                <div className="flex items-center gap-2 p-5 border-b border-border">
+                  <Icon name="Settings" size={18} className="text-primary" />
+                  <h2 className="font-semibold">Настройки</h2>
+                </div>
+                <div className="divide-y divide-border">
+                  {[
+                    { label: 'Уведомления о кампаниях', sub: 'Push при запуске и завершении', icon: 'Bell', on: true },
+                    { label: 'Email-отчёты', sub: 'Еженедельная сводка на почту', icon: 'Mail', on: true },
+                    { label: 'Авто-продление подписки', sub: 'Списание за 3 дня до окончания', icon: 'RefreshCw', on: false },
+                    { label: 'Двухфакторная аутентификация', sub: 'SMS или приложение', icon: 'ShieldCheck', on: false },
+                  ].map((item) => (
+                    <SettingsRow key={item.label} {...item} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Danger zone */}
+              <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon name="AlertTriangle" size={16} className="text-destructive" />
+                  <span className="text-sm font-semibold text-destructive">Опасная зона</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">Эти действия необратимы. Будьте осторожны.</p>
+                <div className="flex gap-2.5 flex-wrap">
+                  <button className="text-sm font-semibold px-4 py-2 rounded-xl border border-destructive/40 text-destructive hover:bg-destructive/10 transition">
+                    Сбросить все данные
+                  </button>
+                  <button className="text-sm font-semibold px-4 py-2 rounded-xl border border-destructive/40 text-destructive hover:bg-destructive/10 transition">
+                    Удалить аккаунт
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
