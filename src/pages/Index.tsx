@@ -23,22 +23,68 @@ const STATS = [
   { label: 'Сообщений в чат', value: '28 109', delta: '+9%', icon: 'MessageSquare', up: true },
 ];
 
-const CAMPAIGNS = [
+const PLATFORM_META: Record<string, { icon: string; color: string }> = {
+  YouTube: { icon: 'Youtube', color: 'text-red-500' },
+  Twitch: { icon: 'Twitch', color: 'text-purple-400' },
+  Kick: { icon: 'Zap', color: 'text-green-400' },
+};
+
+type Campaign = {
+  name: string; platform: string; icon: string;
+  viewers: number; bots: number; progress: number; state: string;
+};
+
+type Scheduled = { time: string; name: string; platform: string; dur: string };
+
+const INITIAL_CAMPAIGNS: Campaign[] = [
   { name: 'Вечерний стрим Dota 2', platform: 'Twitch', icon: 'Twitch', viewers: 4200, bots: 120, progress: 76, state: 'live' },
   { name: 'Премьера клипа', platform: 'YouTube', icon: 'Youtube', viewers: 6800, bots: 90, progress: 54, state: 'live' },
   { name: 'Турнир CS2 финал', platform: 'Kick', icon: 'Zap', viewers: 0, bots: 0, progress: 0, state: 'scheduled' },
   { name: 'Утренний подкаст', platform: 'YouTube', icon: 'Youtube', viewers: 1850, bots: 54, progress: 31, state: 'live' },
 ];
 
-const SCHEDULE = [
+const INITIAL_SCHEDULE: Scheduled[] = [
   { time: '18:00', name: 'Турнир CS2 финал', platform: 'Kick', dur: '3 ч' },
   { time: '20:30', name: 'Стрим General', platform: 'Twitch', dur: '2 ч' },
   { time: '22:00', name: 'Премьера трейлера', platform: 'YouTube', dur: '45 мин' },
   { time: 'Завтра 12:00', name: 'Дневной марафон', platform: 'Twitch', dur: '6 ч' },
 ];
 
+const EMPTY_FORM = { name: '', platform: 'Twitch', viewers: 1000, bots: 50, time: '', dur: '2 ч' };
+
 const Index = () => {
   const [active, setActive] = useState('dashboard');
+  const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
+  const [schedule, setSchedule] = useState<Scheduled[]>(INITIAL_SCHEDULE);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+
+  const openModal = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };
+
+  const submitCampaign = () => {
+    if (!form.name.trim()) return;
+    const meta = PLATFORM_META[form.platform];
+    const scheduled = form.time.trim().length > 0;
+    setCampaigns((prev) => [
+      {
+        name: form.name.trim(),
+        platform: form.platform,
+        icon: meta.icon,
+        viewers: scheduled ? 0 : Number(form.viewers),
+        bots: scheduled ? 0 : Number(form.bots),
+        progress: scheduled ? 0 : 5,
+        state: scheduled ? 'scheduled' : 'live',
+      },
+      ...prev,
+    ]);
+    if (scheduled) {
+      setSchedule((prev) => [
+        { time: form.time.trim(), name: form.name.trim(), platform: form.platform, dur: form.dur },
+        ...prev,
+      ]);
+    }
+    setModalOpen(false);
+  };
 
   return (
     <div className="min-h-screen flex text-foreground">
@@ -147,12 +193,12 @@ const Index = () => {
                   <Icon name="Rocket" size={18} className="text-primary" />
                   <h2 className="font-semibold">Активные кампании</h2>
                 </div>
-                <button className="flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition">
+                <button onClick={openModal} className="flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition">
                   <Icon name="Plus" size={16} /> Новая
                 </button>
               </div>
               <div className="divide-y divide-border">
-                {CAMPAIGNS.map((c) => (
+                {campaigns.map((c) => (
                   <div key={c.name} className="p-5 flex items-center gap-4 hover:bg-secondary/30 transition-colors">
                     <div className="h-10 w-10 rounded-xl bg-secondary grid place-items-center shrink-0">
                       <Icon name={c.icon} size={18} />
@@ -198,7 +244,7 @@ const Index = () => {
                 <span className="ml-auto text-xs text-muted-foreground">авто-запуск</span>
               </div>
               <div className="p-5 space-y-3">
-                {SCHEDULE.map((s) => (
+                {schedule.map((s) => (
                   <div key={s.name} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-secondary/30 hover:border-primary/40 transition-colors">
                     <div className="font-mono-num text-xs font-semibold text-primary w-20 shrink-0">{s.time}</div>
                     <div className="min-w-0 flex-1">
@@ -208,7 +254,7 @@ const Index = () => {
                     <Icon name="ChevronRight" size={16} className="text-muted-foreground shrink-0" />
                   </div>
                 ))}
-                <button className="w-full flex items-center justify-center gap-1.5 text-sm font-semibold py-2.5 rounded-xl border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition">
+                <button onClick={openModal} className="w-full flex items-center justify-center gap-1.5 text-sm font-semibold py-2.5 rounded-xl border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition">
                   <Icon name="Plus" size={16} /> Запланировать кампанию
                 </button>
               </div>
@@ -240,6 +286,118 @@ const Index = () => {
           </section>
         </div>
       </main>
+
+      {/* Modal: New campaign */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-background/70 backdrop-blur-sm animate-fade-in-up"
+          onClick={() => setModalOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-5">
+              <div className="h-9 w-9 rounded-xl bg-primary/15 grid place-items-center">
+                <Icon name="Rocket" size={18} className="text-primary" />
+              </div>
+              <h2 className="font-bold text-lg">Новая кампания</h2>
+              <button onClick={() => setModalOpen(false)} className="ml-auto h-8 w-8 grid place-items-center rounded-lg hover:bg-secondary transition">
+                <Icon name="X" size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">Название кампании</label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Например, Вечерний стрим"
+                  className="mt-1.5 w-full rounded-xl bg-secondary/60 border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">Платформа</label>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                  {(['YouTube', 'Twitch', 'Kick'] as const).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setForm({ ...form, platform: p })}
+                      className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-semibold transition ${
+                        form.platform === p ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:bg-secondary/60'
+                      }`}
+                    >
+                      <Icon name={PLATFORM_META[p].icon} size={20} className={PLATFORM_META[p].color} />
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Зрителей</label>
+                  <input
+                    type="number"
+                    value={form.viewers}
+                    onChange={(e) => setForm({ ...form, viewers: Number(e.target.value) })}
+                    className="mt-1.5 w-full rounded-xl bg-secondary/60 border border-border px-3.5 py-2.5 text-sm font-mono-num outline-none focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Чат-ботов</label>
+                  <input
+                    type="number"
+                    value={form.bots}
+                    onChange={(e) => setForm({ ...form, bots: Number(e.target.value) })}
+                    className="mt-1.5 w-full rounded-xl bg-secondary/60 border border-border px-3.5 py-2.5 text-sm font-mono-num outline-none focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Время запуска</label>
+                  <input
+                    value={form.time}
+                    onChange={(e) => setForm({ ...form, time: e.target.value })}
+                    placeholder="оставьте пустым = сейчас"
+                    className="mt-1.5 w-full rounded-xl bg-secondary/60 border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Длительность</label>
+                  <input
+                    value={form.dur}
+                    onChange={(e) => setForm({ ...form, dur: e.target.value })}
+                    className="mt-1.5 w-full rounded-xl bg-secondary/60 border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Icon name="Info" size={13} />
+                Без времени запуска кампания стартует сразу, иначе попадёт в расписание.
+              </p>
+
+              <div className="flex gap-2.5 pt-1">
+                <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-secondary/60 transition">
+                  Отмена
+                </button>
+                <button
+                  onClick={submitCampaign}
+                  disabled={!form.name.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                >
+                  <Icon name="Rocket" size={16} /> Запустить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
