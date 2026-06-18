@@ -113,7 +113,7 @@ type Account = {
   status: 'active' | 'paused' | 'error'; campaigns: number; viewers: number; added: string;
 };
 
-const nextAccId = 6;
+let nextAccId = 6;
 const GRADIENT_AVATARS = [
   'from-violet-500 to-pink-500',
   'from-red-500 to-orange-400',
@@ -214,11 +214,11 @@ function PlatformCard({ platform: p }: { platform: PlatformDef }) {
       {open && connected && (
         <div className="border-t border-border divide-y divide-border">
           <div className="px-5 py-3 flex items-center gap-2">
-            <Icon name="Sliders" size={14} className="text-muted-foreground" />
+            <Icon name="SlidersHorizontal" size={14} className="text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Настройки платформы</span>
           </div>
           {p.settings.map((s) => (
-            <SettingsRow key={s.label} label={s.label} sub={s.sub} icon="Toggle" on={s.on} />
+            <SettingsRow key={s.label} label={s.label} sub={s.sub} icon="ToggleRight" on={s.on} />
           ))}
         </div>
       )}
