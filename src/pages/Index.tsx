@@ -53,12 +53,92 @@ const INITIAL_SCHEDULE: Scheduled[] = [
 const EMPTY_FORM = { name: '', platform: 'Twitch', viewers: 1000, bots: 50, time: '', dur: '2 ч' };
 let nextId = 5;
 
+// Analytics data
+const HOURS = ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'];
+
+const VIEWERS_DATA: Record<string, number[]> = {
+  YouTube: [1200, 980, 700, 450, 890, 2100, 4800, 6200, 6800, 7400, 5900, 3200],
+  Twitch:  [800,  600, 420, 310, 550, 1400, 2800, 3900, 4200, 5100, 4800, 2900],
+  Kick:    [200,  150, 90,  60,  180, 540,  1100, 1800, 2300, 2100, 1600, 900],
+};
+
+const BOTS_DATA: Record<string, number[]> = {
+  YouTube: [40, 32, 22, 15, 28, 68, 145, 192, 210, 224, 180, 100],
+  Twitch:  [28, 20, 14, 10, 18, 46, 90,  128, 138, 164, 154, 92],
+  Kick:    [8,  6,  4,  2,  6,  18, 36,  58,  74,  68,  52, 30],
+};
+
+const PLATFORM_COLORS: Record<string, string> = {
+  YouTube: '#ef4444',
+  Twitch: '#a855f7',
+  Kick: '#22c55e',
+};
+
+const ANALYTICS_STATS = [
+  { label: 'Пиковые зрители', value: '7 400', sub: 'сегодня в 18:00', icon: 'TrendingUp' },
+  { label: 'Всего зрителей', value: '42 190', sub: 'за 7 дней', icon: 'Eye' },
+  { label: 'Сообщений ботов', value: '184 320', sub: 'за 7 дней', icon: 'MessageSquare' },
+  { label: 'Ср. удержание', value: '73%', sub: 'время в эфире', icon: 'Timer' },
+];
+
+// Tiny SVG sparkline chart helper
+function Sparkline({ data, color, height = 60 }: { data: number[]; color: string; height?: number }) {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const w = 300; const h = height;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / (max - min || 1)) * (h - 8) - 4;
+    return `${x},${y}`;
+  });
+  const area = `M${pts[0]} ` + pts.slice(1).map((p) => `L${p}`).join(' ') + ` L${w},${h} L0,${h} Z`;
+  const line = `M${pts[0]} ` + pts.slice(1).map((p) => `L${p}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" preserveAspectRatio="none" style={{ height }}>
+      <defs>
+        <linearGradient id={`g-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#g-${color.replace('#','')})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Bar chart
+function BarChart({ data, color, labels }: { data: number[]; color: string; labels: string[] }) {
+  const max = Math.max(...data);
+  return (
+    <div className="flex items-end gap-1 h-24 w-full">
+      {data.map((v, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+          <div
+            className="w-full rounded-t-sm transition-all duration-300"
+            style={{ height: `${(v / max) * 100}%`, backgroundColor: color, opacity: 0.75 }}
+          />
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 hidden group-hover:block text-[10px] font-mono-num bg-card border border-border px-1.5 py-0.5 rounded whitespace-nowrap z-10">
+            {v.toLocaleString('ru')}
+          </div>
+          {i % 2 === 0 && <span className="text-[9px] text-muted-foreground">{labels[i]}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const Index = () => {
   const [active, setActive] = useState('dashboard');
   const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
   const [schedule, setSchedule] = useState<Scheduled[]>(INITIAL_SCHEDULE);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'day' | 'week'>('day');
+  const [activePlatforms, setActivePlatforms] = useState<string[]>(['YouTube', 'Twitch', 'Kick']);
+
+  const togglePlatform = (p: string) =>
+    setActivePlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
 
   const openModal = () => { setForm({ ...EMPTY_FORM }); setModalOpen(true); };
 
@@ -171,6 +251,150 @@ const Index = () => {
         </header>
 
         <div className="p-5 sm:p-8 space-y-8 max-w-[1400px]">
+
+          {/* ─── ANALYTICS ─── */}
+          {active === 'analytics' && (
+            <div className="space-y-8 animate-fade-in-up">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Аналитика</h1>
+                  <p className="text-muted-foreground mt-1">Графики зрителей и активности чат-ботов по времени.</p>
+                </div>
+                <div className="sm:ml-auto flex gap-2">
+                  {(['day', 'week'] as const).map((p) => (
+                    <button key={p} onClick={() => setAnalyticsPeriod(p)}
+                      className={`text-sm font-semibold px-4 py-2 rounded-xl border transition ${analyticsPeriod === p ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-secondary/60'}`}>
+                      {p === 'day' ? 'Сегодня' : '7 дней'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {ANALYTICS_STATS.map((s) => (
+                  <div key={s.label} className="rounded-2xl border border-border bg-card p-5 hover:border-primary/40 transition-colors">
+                    <div className="h-9 w-9 rounded-xl bg-secondary grid place-items-center mb-4">
+                      <Icon name={s.icon} size={18} className="text-primary" />
+                    </div>
+                    <div className="font-mono-num text-2xl font-bold">{s.value}</div>
+                    <div className="text-sm font-medium mt-0.5">{s.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{s.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Platform toggle */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-muted-foreground font-semibold uppercase tracking-widest">Платформы:</span>
+                {(['YouTube', 'Twitch', 'Kick'] as const).map((p) => (
+                  <button key={p} onClick={() => togglePlatform(p)}
+                    className={`flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-lg border transition ${activePlatforms.includes(p) ? 'border-transparent text-foreground' : 'border-border text-muted-foreground opacity-50'}`}
+                    style={activePlatforms.includes(p) ? { backgroundColor: PLATFORM_COLORS[p] + '22', borderColor: PLATFORM_COLORS[p] + '66' } : {}}>
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              {/* Viewers chart */}
+              <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <Icon name="Eye" size={18} className="text-primary" />
+                  <h2 className="font-semibold">Зрители по времени</h2>
+                  <span className="ml-auto font-mono-num text-xs text-muted-foreground">пик 7 400</span>
+                </div>
+                <div className="space-y-3">
+                  {(['YouTube', 'Twitch', 'Kick'] as const).filter((p) => activePlatforms.includes(p)).map((p) => (
+                    <div key={p}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
+                        <span className="text-xs font-semibold text-muted-foreground">{p}</span>
+                        <span className="ml-auto font-mono-num text-xs text-muted-foreground">
+                          {Math.max(...VIEWERS_DATA[p]).toLocaleString('ru')} пик
+                        </span>
+                      </div>
+                      <Sparkline data={VIEWERS_DATA[p]} color={PLATFORM_COLORS[p]} height={56} />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between mt-2 px-1">
+                  {HOURS.map((h) => (
+                    <span key={h} className="text-[10px] text-muted-foreground">{h}:00</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bots chart */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Icon name="Bot" size={18} className="text-primary" />
+                    <h2 className="font-semibold">Активность чат-ботов</h2>
+                  </div>
+                  <div className="space-y-4">
+                    {(['YouTube', 'Twitch', 'Kick'] as const).filter((p) => activePlatforms.includes(p)).map((p) => (
+                      <div key={p}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
+                          <span className="text-xs font-semibold text-muted-foreground">{p}</span>
+                          <span className="ml-auto font-mono-num text-xs text-muted-foreground">
+                            {Math.max(...BOTS_DATA[p])} макс
+                          </span>
+                        </div>
+                        <BarChart data={BOTS_DATA[p]} color={PLATFORM_COLORS[p]} labels={HOURS} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Platform breakdown */}
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Icon name="PieChart" size={18} className="text-primary" />
+                    <h2 className="font-semibold">Распределение зрителей</h2>
+                  </div>
+                  <div className="space-y-4">
+                    {(['YouTube', 'Twitch', 'Kick'] as const).map((p) => {
+                      const total = Object.values(VIEWERS_DATA).flat().reduce((a, b) => a + b, 0);
+                      const pTotal = VIEWERS_DATA[p].reduce((a, b) => a + b, 0);
+                      const pct = Math.round((pTotal / total) * 100);
+                      return (
+                        <div key={p}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Icon name={PLATFORM_META[p].icon} size={16} className={PLATFORM_META[p].color} />
+                            <span className="text-sm font-medium">{p}</span>
+                            <span className="ml-auto font-mono-num text-sm font-bold">{pct}%</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700"
+                              style={{ width: `${pct}%`, backgroundColor: PLATFORM_COLORS[p] }} />
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {pTotal.toLocaleString('ru')} зрителей суммарно
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-6 pt-5 border-t border-border space-y-2">
+                    <div className="text-xs text-muted-foreground font-semibold uppercase tracking-widest mb-3">Топ кампании</div>
+                    {campaigns.filter((c) => c.state === 'live').slice(0, 3).map((c) => (
+                      <div key={c.id} className="flex items-center gap-2">
+                        <Icon name={c.icon} size={14} />
+                        <span className="text-sm truncate flex-1">{c.name}</span>
+                        <span className="font-mono-num text-xs font-bold text-accent">{c.viewers.toLocaleString('ru')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── DASHBOARD ─── */}
+          {active !== 'analytics' && <>
           {/* Hero */}
           <section className="animate-fade-in-up">
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
@@ -350,6 +574,7 @@ const Index = () => {
               ))}
             </div>
           </section>
+          </>}
         </div>
       </main>
 
